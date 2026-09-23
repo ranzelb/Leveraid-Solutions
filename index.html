@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leveraid Solutions — Attendance & Internship Portal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.45.4/supabase.min.js"></script>
+<style>
+  body{font-family:Inter,system-ui,sans-serif;background:#f4f6f8;}
+  .card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .btn{border-radius:10px;padding:.6rem 1.1rem;font-weight:600;transition:.15s;}
+  .btn-primary{background:#0f3d4a;color:#fff;}
+  .btn-primary:hover{background:#0b2c36;}
+  .btn-secondary{background:#e8edf0;color:#0f3d4a;}
+  .btn-secondary:hover{background:#dbe3e7;}
+  .btn-danger{background:#c0392b;color:#fff;}
+  .tab-btn.active{border-bottom:3px solid #0f3d4a;color:#0f3d4a;font-weight:700;}
+  table{width:100%;border-collapse:collapse;font-size:.875rem;}
+  th{text-align:left;padding:.6rem .75rem;background:#f0f3f4;color:#456;font-weight:600;position:sticky;top:0;}
+  td{padding:.55rem .75rem;border-bottom:1px solid #eef1f2;}
+  .badge{display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.72rem;font-weight:700;}
+  .modal-backdrop{background:rgba(15,25,30,.55);}
+  ::-webkit-scrollbar{height:8px;width:8px;} ::-webkit-scrollbar-thumb{background:#c7d0d3;border-radius:8px;}
+</style>
+</head>
+<body>
+
+<!-- ===================== CONFIG NOTICE ===================== -->
+<div id="config-warning" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
+  <div class="card p-6 max-w-md text-center">
+    <h2 class="text-lg font-bold text-red-600 mb-2">Supabase not configured</h2>
+    <p class="text-sm text-gray-600">Open this file and set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>
+    near the top of the &lt;script&gt; block to your project's values (Project Settings → API). Never put your
+    service-role key here.</p>
+  </div>
+</div>
+
+<!-- ===================== LOGIN VIEW ===================== -->
+<div id="view-login" class="min-h-screen flex items-center justify-center px-4">
+  <div class="card w-full max-w-sm p-8">
+    <div class="flex items-center gap-2 mb-1">
+      <div class="w-9 h-9 rounded-lg bg-[#0f3d4a] text-white flex items-center justify-center font-bold">LA</div>
+      <div>
+        <div class="font-extrabold text-[#0f3d4a] leading-tight">LEVERAID</div>
+        <div class="text-[10px] tracking-widest text-[#1a8f9c] -mt-1">SOLUTIONS</div>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500 mb-6">Attendance, Leave & Internship Portal</p>
+
+    <form id="login-form" class="space-y-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-600">Email</label>
+        <input id="login-email" type="email" required class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="you@leveraidsolutions.com">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-600">Password</label>
+        <div class="relative">
+          <input id="login-password" type="password" required class="mt-1 w-full border rounded-lg px-3 py-2 text-sm pr-16">
+          <button type="button" id="toggle-pw" class="absolute right-2 top-3 text-xs text-[#1a8f9c] font-semibold">Show</button>
+        </div>
+      </div>
+      <p id="login-error" class="text-xs text-red-600 hidden"></p>
+      <button type="submit" id="login-btn" class="btn btn-primary w-full mt-2">Log In</button>
+      <button type="button" id="forgot-pw" class="text-xs text-gray-500 underline w-full text-center mt-1">Forgot password?</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== APP SHELL ===================== -->
+<div id="app-shell" class="hidden min-h-screen">
+  <header class="bg-white border-b sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-[#0f3d4a] text-white flex items-center justify-center font-bold text-sm">LA</div>
+        <span class="font-bold text-[#0f3d4a]">Leveraid Solutions</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="hdr-clock" class="text-xs text-gray-500 hidden sm:block"></span>
+        <span id="hdr-name" class="text-sm font-semibold"></span>
+        <span id="hdr-role" class="badge bg-[#e6f4f1] text-[#0f3d4a]"></span>
+        <button id="logout-btn" class="btn btn-secondary !py-1.5 !px-3 text-sm">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- EMPLOYEE / INTERN DASHBOARD -->
+  <main id="view-employee" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="card p-5 md:col-span-1">
+        <h3 class="font-bold text-[#0f3d4a] mb-1">Today's Attendance</h3>
+        <p id="emp-today-date" class="text-xs text-gray-500 mb-4"></p>
+        <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+          <div><div class="text-gray-500 text-xs">Clock In</div><div id="emp-clockin" class="font-semibold">—</div></div>
+          <div><div class="text-gray-500 text-xs">Clock Out</div><div id="emp-clockout" class="font-semibold">—</div></div>
+          <div><div class="text-gray-500 text-xs">Total Time</div><div id="emp-total" class="font-semibold">—</div></div>
+          <div><div class="text-gray-500 text-xs">Credited Time</div><div id="emp-credited" class="font-semibold">—</div></div>
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-clockin" class="btn btn-primary flex-1">CLOCK IN</button>
+          <button id="btn-clockout" class="btn btn-danger flex-1">CLOCK OUT</button>
+        </div>
+        <p id="emp-clock-msg" class="text-xs mt-2 text-gray-500"></p>
+      </div>
+
+      <div id="emp-intern-card" class="card p-5 hidden md:col-span-1">
+        <h3 class="font-bold text-[#0f3d4a] mb-3">Internship Progress</h3>
+        <div class="text-sm space-y-1 mb-3">
+          <div class="flex justify-between"><span class="text-gray-500">Required</span><span id="int-required" class="font-semibold"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Completed</span><span id="int-completed" class="font-semibold"></span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Remaining</span><span id="int-remaining" class="font-semibold"></span></div>
+        </div>
+        <div class="w-full bg-gray-100 rounded-full h-2.5"><div id="int-bar" class="bg-[#1a8f9c] h-2.5 rounded-full" style="width:0%"></div></div>
+        <p id="int-progress-text" class="text-xs text-right mt-1 text-gray-500"></p>
+        <p class="text-xs text-gray-400 mt-3" id="int-meta"></p>
+      </div>
+
+      <div class="card p-5 md:col-span-1">
+        <h3 class="font-bold text-[#0f3d4a] mb-3">Request Leave</h3>
+        <form id="leave-form" class="space-y-2 text-sm">
+          <select id="leave-type" class="w-full border rounded-lg px-2 py-1.5">
+            <option value="vacation">Vacation</option><option value="sick">Sick</option>
+            <option value="emergency">Emergency</option><option value="personal">Personal</option>
+            <option value="official_business">Official Business</option><option value="other">Other</option>
+          </select>
+          <div class="flex gap-2">
+            <input id="leave-start" type="date" required class="w-1/2 border rounded-lg px-2 py-1.5">
+            <input id="leave-end" type="date" required class="w-1/2 border rounded-lg px-2 py-1.5">
+          </div>
+          <textarea id="leave-reason" placeholder="Reason" class="w-full border rounded-lg px-2 py-1.5" rows="2"></textarea>
+          <button class="btn btn-primary w-full !py-1.5 text-sm">Submit Request</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <h3 class="font-bold text-[#0f3d4a] mb-3">My Attendance History</h3>
+      <div class="overflow-x-auto"><table id="emp-history-table"><thead><tr>
+        <th>Date</th><th>Clock In</th><th>Clock Out</th><th>Break</th><th>Total</th><th>Credited</th><th>Status</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card p-5">
+        <h3 class="font-bold text-[#0f3d4a] mb-3">My Leaves</h3>
+        <div class="overflow-x-auto"><table id="emp-leaves-table"><thead><tr>
+          <th>Type</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-bold text-[#0f3d4a] mb-3">My Rest Days</h3>
+        <div class="overflow-x-auto"><table id="emp-restdays-table"><thead><tr>
+          <th>Date</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ADMIN DASHBOARD -->
+  <main id="view-admin" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div id="admin-stats" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+
+    <div class="card p-0 overflow-hidden">
+      <div id="admin-tabs" class="flex overflow-x-auto border-b text-sm">
+        <button data-tab="employees" class="tab-btn active px-4 py-3 whitespace-nowrap">Employees</button>
+        <button data-tab="leaves" class="tab-btn px-4 py-3 whitespace-nowrap">Leaves</button>
+        <button data-tab="restdays" class="tab-btn px-4 py-3 whitespace-nowrap">Rest Days</button>
+        <button data-tab="breaks" class="tab-btn px-4 py-3 whitespace-nowrap">Break Schedule</button>
+        <button data-tab="interns" class="tab-btn px-4 py-3 whitespace-nowrap">Interns</button>
+        <button data-tab="attendance" class="tab-btn px-4 py-3 whitespace-nowrap">Attendance</button>
+        <button data-tab="reports" class="tab-btn px-4 py-3 whitespace-nowrap">Reports</button>
+      </div>
+
+      <div class="p-5">
+        <!-- EMPLOYEES TAB -->
+        <div id="tab-employees" class="tab-panel">
+          <div class="flex flex-wrap gap-2 justify-between items-center mb-3">
+            <input id="emp-search" placeholder="Search employees…" class="border rounded-lg px-3 py-1.5 text-sm w-64">
+            <button id="btn-add-employee" class="btn btn-primary text-sm">+ Add Employee</button>
+          </div>
+          <div class="overflow-x-auto"><table id="employees-table"><thead><tr>
+            <th>ID</th><th>Name</th><th>Email</th><th>Dept</th><th>Position</th><th>Type</th><th>Status</th><th>Hired</th><th>Actions</th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <!-- LEAVES TAB -->
+        <div id="tab-leaves" class="tab-panel hidden">
+          <div class="overflow-x-auto"><table id="leaves-table"><thead><tr>
+            <th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Reason</th><th>Status</th><th>Actions</th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <!-- REST DAYS TAB -->
+        <div id="tab-restdays" class="tab-panel hidden">
+          <form id="restday-form" class="flex flex-wrap gap-2 items-end mb-4 text-sm">
+            <div><label class="text-xs text-gray-500 block">Employee</label>
+              <select id="rd-employee" class="border rounded-lg px-2 py-1.5"></select></div>
+            <div><label class="text-xs text-gray-500 block">Date</label>
+              <input id="rd-date" type="date" required class="border rounded-lg px-2 py-1.5"></div>
+            <div class="flex-1 min-w-[160px]"><label class="text-xs text-gray-500 block">Notes</label>
+              <input id="rd-notes" class="border rounded-lg px-2 py-1.5 w-full"></div>
+            <button class="btn btn-primary !py-1.5">Assign Rest Day</button>
+          </form>
+          <div class="overflow-x-auto"><table id="restdays-table"><thead><tr>
+            <th>Employee</th><th>Date</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <!-- BREAK SCHEDULE TAB -->
+        <div id="tab-breaks" class="tab-panel hidden">
+          <form id="break-form" class="flex flex-wrap gap-2 items-end mb-4 text-sm">
+            <div><label class="text-xs text-gray-500 block">Name</label>
+              <input id="brk-name" value="Lunch Break" class="border rounded-lg px-2 py-1.5"></div>
+            <div><label class="text-xs text-gray-500 block">Start</label>
+              <input id="brk-start" type="time" value="12:00" required class="border rounded-lg px-2 py-1.5"></div>
+            <div><label class="text-xs text-gray-500 block">End</label>
+              <input id="brk-end" type="time" value="13:00" required class="border rounded-lg px-2 py-1.5"></div>
+            <button class="btn btn-primary !py-1.5">Save Break Schedule</button>
+          </form>
+          <p class="text-xs text-gray-500 mb-2">New employees/interns must be assigned a schedule below (defaults to the active one on creation).</p>
+          <div class="overflow-x-auto"><table id="breaks-table"><thead><tr>
+            <th>Name</th><th>Start</th><th>End</th><th>Active</th></tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <!-- INTERNS TAB -->
+        <div id="tab-interns" class="tab-panel hidden">
+          <div class="overflow-x-auto"><table id="interns-table"><thead><tr>
+            <th>Intern</th><th>School</th><th>Required</th><th>Completed</th><th>Remaining</th><th>Progress</th><th>Status</th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <!-- ATTENDANCE TAB -->
+        <div id="tab-attendance" class="tab-panel hidden">
+          <div class="flex flex-wrap gap-2 mb-3 text-sm">
+            <input id="att-from" type="date" class="border rounded-lg px-2 py-1.5">
+            <input id="att-to" type="date" class="border rounded-lg px-2 py-1.5">
+            <button id="att-filter-btn" class="btn btn-secondary !py-1.5">Filter</button>
+          </div>
+          <div class="overflow-x-auto"><table id="attendance-table"><thead><tr>
+            <th>Date</th><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Break</th><th>Total</th><th>Credited</th><th>Status</th><th>Actions</th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <!-- REPORTS TAB -->
+        <div id="tab-reports" class="tab-panel hidden">
+          <div class="flex flex-wrap gap-2 items-end text-sm">
+            <div><label class="text-xs text-gray-500 block">From</label><input id="rep-from" type="date" class="border rounded-lg px-2 py-1.5"></div>
+            <div><label class="text-xs text-gray-500 block">To</label><input id="rep-to" type="date" class="border rounded-lg px-2 py-1.5"></div>
+            <button id="rep-attendance-csv" class="btn btn-primary !py-1.5">Export Attendance CSV</button>
+            <button id="rep-intern-csv" class="btn btn-secondary !py-1.5">Export Internship CSV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===================== ADD/EDIT EMPLOYEE MODAL ===================== -->
+<div id="employee-modal" class="hidden fixed inset-0 z-40 modal-backdrop flex items-center justify-center p-4">
+  <div class="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <h3 id="emp-modal-title" class="font-bold text-lg text-[#0f3d4a] mb-4">Add Employee</h3>
+    <form id="employee-form" class="space-y-2 text-sm">
+      <input type="hidden" id="f-employee-id">
+      <input type="hidden" id="f-profile-id">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="f-first" placeholder="First Name" required class="border rounded-lg px-2 py-1.5">
+        <input id="f-last" placeholder="Last Name" required class="border rounded-lg px-2 py-1.5">
+      </div>
+      <input id="f-email" type="email" placeholder="Email" required class="border rounded-lg px-2 py-1.5 w-full">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="f-phone" placeholder="Phone" class="border rounded-lg px-2 py-1.5">
+        <input id="f-dob" type="date" placeholder="Date of Birth" class="border rounded-lg px-2 py-1.5">
+      </div>
+      <input id="f-address" placeholder="Address" class="border rounded-lg px-2 py-1.5 w-full">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="f-empno" placeholder="Employee ID" required class="border rounded-lg px-2 py-1.5">
+        <select id="f-dept" class="border rounded-lg px-2 py-1.5"></select>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <input id="f-position" placeholder="Position" class="border rounded-lg px-2 py-1.5">
+        <input id="f-hired" type="date" class="border rounded-lg px-2 py-1.5">
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <select id="f-type" class="border rounded-lg px-2 py-1.5">
+          <option value="regular">Regular</option><option value="part_time">Part-Time</option>
+          <option value="contractual">Contractual</option><option value="intern">Intern / Student</option>
+        </select>
+        <select id="f-status" class="border rounded-lg px-2 py-1.5">
+          <option value="active">Active</option><option value="inactive">Inactive</option><option value="on_leave">On Leave</option>
+        </select>
+        <select id="f-role" class="border rounded-lg px-2 py-1.5">
+          <option value="employee">Employee</option><option value="intern">Intern</option><option value="admin">Admin</option>
+        </select>
+      </div>
+
+      <div id="f-intern-fields" class="hidden space-y-2 border-t pt-2 mt-2">
+        <p class="text-xs font-semibold text-[#0f3d4a]">Internship Information</p>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="f-school" placeholder="School Name" class="border rounded-lg px-2 py-1.5">
+          <input id="f-course" placeholder="Course / Program" class="border rounded-lg px-2 py-1.5">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="f-int-start" type="date" class="border rounded-lg px-2 py-1.5">
+          <input id="f-int-end" type="date" class="border rounded-lg px-2 py-1.5">
+        </div>
+        <input id="f-int-hours" type="number" min="0" placeholder="Required Internship Hours (e.g. 500)" class="border rounded-lg px-2 py-1.5 w-full">
+      </div>
+
+      <div id="f-account-note" class="text-xs text-gray-500 border-t pt-2 mt-2">
+        Saving here creates the profile + employee record only. To let this person log in, invite them from
+        <b>Supabase → Authentication → Users → Invite user</b> with the same email, then paste their generated
+        <b>User UID</b> below to link the login to this record (creating auth accounts needs the service-role key,
+        which must never live in this file).
+        <input id="f-user-id" placeholder="Auth User UID (optional, paste after inviting)" class="border rounded-lg px-2 py-1.5 w-full mt-1">
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="button" id="emp-modal-cancel" class="btn btn-secondary flex-1">Cancel</button>
+        <button type="submit" class="btn btn-primary flex-1">Save</button>
+      </div>
+      <p id="emp-form-error" class="text-xs text-red-600 hidden"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== ATTENDANCE CORRECTION MODAL ===================== -->
+<div id="attendance-modal" class="hidden fixed inset-0 z-40 modal-backdrop flex items-center justify-center p-4">
+  <div class="card p-6 w-full max-w-sm">
+    <h3 class="font-bold text-lg text-[#0f3d4a] mb-4">Correct Attendance</h3>
+    <form id="attendance-correct-form" class="space-y-2 text-sm">
+      <input type="hidden" id="ac-id">
+      <label class="text-xs text-gray-500">Clock In</label>
+      <input id="ac-clockin" type="datetime-local" class="border rounded-lg px-2 py-1.5 w-full">
+      <label class="text-xs text-gray-500">Clock Out</label>
+      <input id="ac-clockout" type="datetime-local" class="border rounded-lg px-2 py-1.5 w-full">
+      <label class="text-xs text-gray-500">Notes</label>
+      <textarea id="ac-notes" class="border rounded-lg px-2 py-1.5 w-full" rows="2"></textarea>
+      <div class="flex gap-2 pt-2">
+        <button type="button" id="ac-cancel" class="btn btn-secondary flex-1">Cancel</button>
+        <button type="submit" class="btn btn-primary flex-1">Save Correction</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG — replace with your Supabase project values (Project Settings
+   → API). The anon/public key is safe for client code; NEVER put a
+   service-role key here.
+===================================================================== */
+const SUPABASE_URL = "https://fztuxkjnfzxpvkmnfnnl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dHV4a2puZnp4cHZrbW5mbm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMjU5NjIsImV4cCI6MjEwNTcwMTk2Mn0.NzbnRtfSXj0-TyJD3hcTVgsKGrFtdY9bqjZKRmbrRQ4";
+
+if (SUPABASE_URL.includes("YOUR-PROJECT")) {
+  document.getElementById('config-warning').classList.remove('hidden');
+}
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const TZ = 'Asia/Manila';
+const $ = (id) => document.getElementById(id);
+const fmtDate = (d) => new Date(d).toLocaleDateString('en-PH', { timeZone: TZ, year:'numeric', month:'short', day:'numeric' });
+const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-PH', { timeZone: TZ, hour:'2-digit', minute:'2-digit' }) : '—';
+const fmtHrs  = (mins) => mins == null ? '—' : (mins/60).toFixed(1) + ' hrs';
+const statusColor = (s) => ({
+  present:'bg-green-100 text-green-700', late:'bg-yellow-100 text-yellow-700',
+  absent:'bg-red-100 text-red-700', leave:'bg-blue-100 text-blue-700',
+  rest_day:'bg-purple-100 text-purple-700', half_day:'bg-orange-100 text-orange-700',
+  incomplete:'bg-gray-200 text-gray-600', holiday:'bg-pink-100 text-pink-700',
+  pending:'bg-yellow-100 text-yellow-700', approved:'bg-green-100 text-green-700',
+  rejected:'bg-red-100 text-red-700', cancelled:'bg-gray-200 text-gray-600'
+}[s] || 'bg-gray-100 text-gray-600');
+
+let state = { user:null, employee:null, profile:null, departments:[], employeesCache:[] };
+
+/* ---------------------- AUTH ---------------------- */
+$('toggle-pw').onclick = () => {
+  const pw = $('login-password');
+  pw.type = pw.type === 'password' ? 'text' : 'password';
+  $('toggle-pw').textContent = pw.type === 'password' ? 'Show' : 'Hide';
+};
+
+$('forgot-pw').onclick = async () => {
+  const email = $('login-email').value;
+  if (!email) return alert('Enter your email first, then click Forgot password.');
+  const { error } = await sb.auth.resetPasswordForEmail(email);
+  alert(error ? error.message : 'Password reset email sent (check inbox).');
+};
+
+$('login-form').onsubmit = async (e) => {
+  e.preventDefault();
+  $('login-error').classList.add('hidden');
+  $('login-btn').disabled = true; $('login-btn').textContent = 'Logging in…';
+  const { error } = await sb.auth.signInWithPassword({
+    email: $('login-email').value, password: $('login-password').value
+  });
+  $('login-btn').disabled = false; $('login-btn').textContent = 'Log In';
+  if (error) { $('login-error').textContent = error.message; $('login-error').classList.remove('hidden'); return; }
+  await bootAfterLogin();
+};
+
+$('logout-btn').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function bootAfterLogin() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  state.user = user;
+
+  const { data: profile } = await sb.from('profiles').select('*').eq('user_id', user.id).single();
+  if (!profile) { alert('No profile linked to this login yet. Ask an admin to link your account.'); await sb.auth.signOut(); return; }
+  state.profile = profile;
+
+  const { data: employee } = await sb.from('employees').select('*, departments(name)').eq('profile_id', profile.id).single();
+  if (!employee) { alert('No employee record linked yet. Ask an admin to finish your setup.'); await sb.auth.signOut(); return; }
+  state.employee = employee;
+
+  $('view-login').classList.add('hidden');
+  $('app-shell').classList.remove('hidden');
+  $('hdr-name').textContent = profile.first_name + ' ' + profile.last_name;
+  $('hdr-role').textContent = employee.role.toUpperCase();
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  if (employee.role === 'admin') {
+    $('view-admin').classList.remove('hidden');
+    await loadAdmin();
+  } else {
+    $('view-employee').classList.remove('hidden');
+    await loadEmployeeDashboard();
+  }
+}
+
+function tickClock() {
+  $('hdr-clock').textContent = new Date().toLocaleString('en-PH', { timeZone: TZ, dateStyle:'medium', timeStyle:'medium' });
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await bootAfterLogin();
+})();
+
+/* ---------------------- EMPLOYEE DASHBOARD ---------------------- */
+async function loadEmployeeDashboard() {
+  $('emp-today-date').textContent = fmtDate(new Date());
+  await refreshTodayAttendance();
+  await refreshEmpHistory();
+  await refreshEmpLeaves();
+  await refreshEmpRestDays();
+  if (state.employee.role === 'intern') {
+    $('emp-intern-card').classList.remove('hidden');
+    await refreshInternProgress();
+  }
+}
+
+async function refreshTodayAttendance() {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+  const { data } = await sb.from('attendance').select('*').eq('employee_id', state.employee.id).eq('attendance_date', today).maybeSingle();
+  $('emp-clockin').textContent = data ? fmtTime(data.clock_in) : '—';
+  $('emp-clockout').textContent = data ? fmtTime(data.clock_out) : '—';
+  $('emp-total').textContent = data ? fmtHrs(data.worked_minutes) : '—';
+  $('emp-credited').textContent = data ? fmtHrs(data.credited_minutes) : '—';
+  $('btn-clockin').disabled = !!data;
+  $('btn-clockout').disabled = !data || !!data.clock_out;
+}
+
+$('btn-clockin').onclick = async () => {
+  $('emp-clock-msg').textContent = '';
+  const { error } = await sb.rpc('clock_in');
+  if (error) { $('emp-clock-msg').textContent = error.message; return; }
+  await refreshTodayAttendance(); await refreshEmpHistory();
+};
+$('btn-clockout').onclick = async () => {
+  $('emp-clock-msg').textContent = '';
+  const { error } = await sb.rpc('clock_out');
+  if (error) { $('emp-clock-msg').textContent = error.message; return; }
+  await refreshTodayAttendance(); await refreshEmpHistory();
+  if (state.employee.role === 'intern') await refreshInternProgress();
+};
+
+async function refreshEmpHistory() {
+  const { data } = await sb.from('attendance').select('*').eq('employee_id', state.employee.id)
+    .order('attendance_date', { ascending:false }).limit(30);
+  const tbody = document.querySelector('#emp-history-table tbody');
+  tbody.innerHTML = (data||[]).map(r => `<tr>
+    <td>${fmtDate(r.attendance_date)}</td><td>${fmtTime(r.clock_in)}</td><td>${fmtTime(r.clock_out)}</td>
+    <td>${r.break_minutes} min</td><td>${fmtHrs(r.worked_minutes)}</td><td>${fmtHrs(r.credited_minutes)}</td>
+    <td><span class="badge ${statusColor(r.status)}">${r.status}</span></td></tr>`).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-4">No records yet.</td></tr>';
+}
+
+async function refreshEmpLeaves() {
+  const { data } = await sb.from('leaves').select('*').eq('employee_id', state.employee.id).order('created_at', { ascending:false });
+  document.querySelector('#emp-leaves-table tbody').innerHTML = (data||[]).map(l => `<tr>
+    <td>${l.leave_type}</td><td>${fmtDate(l.start_date)}</td><td>${fmtDate(l.end_date)}</td>
+    <td><span class="badge ${statusColor(l.status)}">${l.status}</span></td></tr>`).join('') || '<tr><td colspan="4" class="text-center text-gray-400 py-4">No leave requests.</td></tr>';
+}
+
+async function refreshEmpRestDays() {
+  const { data } = await sb.from('rest_days').select('*').eq('employee_id', state.employee.id).order('rest_date', { ascending:false });
+  document.querySelector('#emp-restdays-table tbody').innerHTML = (data||[]).map(r => `<tr>
+    <td>${fmtDate(r.rest_date)}</td><td>${r.notes||''}</td></tr>`).join('') || '<tr><td colspan="2" class="text-center text-gray-400 py-4">None assigned.</td></tr>';
+}
+
+async function refreshInternProgress() {
+  const { data } = await sb.from('internship_progress').select('*').eq('employee_id', state.employee.id).maybeSingle();
+  if (!data) return;
+  $('int-required').textContent = data.required_hours + ' hrs';
+  $('int-completed').textContent = data.completed_hours + ' hrs';
+  $('int-remaining').textContent = data.remaining_hours + ' hrs';
+  $('int-bar').style.width = data.progress_percent + '%';
+  $('int-progress-text').textContent = data.progress_percent + '% — ' + data.status;
+  $('int-meta').textContent = `${data.school_name||''} · ${data.course||''} · ${data.start_date?fmtDate(data.start_date):''} to ${data.end_date?fmtDate(data.end_date):''}`;
+}
+
+$('leave-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const { error } = await sb.from('leaves').insert({
+    employee_id: state.employee.id, leave_type: $('leave-type').value,
+    start_date: $('leave-start').value, end_date: $('leave-end').value,
+    reason: $('leave-reason').value, status: 'pending'
+  });
+  if (error) return alert(error.message);
+  e.target.reset();
+  await refreshEmpLeaves();
+};
+
+/* ---------------------- ADMIN DASHBOARD ---------------------- */
+document.querySelectorAll('#admin-tabs .tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#admin-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    $('tab-' + btn.dataset.tab).classList.remove('hidden');
+  };
+});
+
+async function loadAdmin() {
+  const { data: depts } = await sb.from('departments').select('*').order('name');
+  state.departments = depts || [];
+  $('f-dept').innerHTML = state.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('') || '<option value="">No departments yet</option>';
+
+  await Promise.all([
+    loadAdminStats(), loadEmployeesTable(), loadLeavesTable(),
+    loadRestDaysTable(), loadBreaksTable(), loadInternsTable(), loadAttendanceTable()
+  ]);
+}
+
+async function loadAdminStats() {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+  const [{ count: totalEmp }, { data: todayAtt }, { data: onLeave }, { data: interns }] = await Promise.all([
+    sb.from('employees').select('*', { count:'exact', head:true }).eq('status','active'),
+    sb.from('attendance').select('status').eq('attendance_date', today),
+    sb.from('leaves').select('id').eq('status','approved').lte('start_date', today).gte('end_date', today),
+    sb.from('internships').select('id').eq('status','active')
+  ]);
+  const present = (todayAtt||[]).filter(a=>a.status==='present').length;
+  const late = (todayAtt||[]).filter(a=>a.status==='late').length;
+  const restDay = (todayAtt||[]).filter(a=>a.status==='rest_day').length;
+  const stats = [
+    ['Total Employees', totalEmp||0], ['Present Today', present],
+    ['Late Today', late], ['On Leave', (onLeave||[]).length],
+    ['Rest Day', restDay], ['Active Interns', (interns||[]).length]
+  ];
+  $('admin-stats').innerHTML = stats.map(([label,val]) => `
+    <div class="card p-4"><div class="text-xs text-gray-500">${label}</div><div class="text-2xl font-extrabold text-[#0f3d4a]">${val}</div></div>`).join('');
+}
+
+async function loadEmployeesTable() {
+  const { data } = await sb.from('employees').select('*, profiles(*), departments(name)').order('created_at', { ascending:false });
+  state.employeesCache = data || [];
+  renderEmployeesTable(state.employeesCache);
+  const rdSelect = $('rd-employee');
+  rdSelect.innerHTML = state.employeesCache.map(e => `<option value="${e.id}">${e.profiles.first_name} ${e.profiles.last_name}</option>`).join('');
+}
+function renderEmployeesTable(list) {
+  document.querySelector('#employees-table tbody').innerHTML = list.map(e => `<tr>
+    <td>${e.employee_number}</td><td>${e.profiles.first_name} ${e.profiles.last_name}</td><td>${e.profiles.email}</td>
+    <td>${e.departments?.name||'—'}</td><td>${e.position||'—'}</td><td>${e.employment_type}</td>
+    <td><span class="badge ${e.status==='active'?'bg-green-100 text-green-700':e.status==='inactive'?'bg-gray-200 text-gray-600':'bg-blue-100 text-blue-700'}">${e.status}</span></td>
+    <td>${fmtDate(e.date_hired)}</td>
+    <td class="whitespace-nowrap">
+      <button class="text-[#1a8f9c] text-xs font-semibold mr-2" onclick="editEmployee('${e.id}')">Edit</button>
+      <button class="text-xs font-semibold ${e.status==='active'?'text-red-600':'text-green-600'}" onclick="toggleEmployeeStatus('${e.id}','${e.status}')">${e.status==='active'?'Deactivate':'Activate'}</button>
+    </td></tr>`).join('') || '<tr><td colspan="9" class="text-center text-gray-400 py-6">No employees yet.</td></tr>';
+}
+$('emp-search').oninput = (e) => {
+  const q = e.target.value.toLowerCase();
+  renderEmployeesTable(state.employeesCache.filter(x =>
+    (x.profiles.first_name+' '+x.profiles.last_name+' '+x.profiles.email+' '+x.employee_number).toLowerCase().includes(q)));
+};
+
+$('f-type').onchange = () => $('f-intern-fields').classList.toggle('hidden', $('f-type').value !== 'intern');
+
+$('btn-add-employee').onclick = () => openEmployeeModal();
+$('emp-modal-cancel').onclick = () => $('employee-modal').classList.add('hidden');
+
+function openEmployeeModal(emp) {
+  $('employee-form').reset();
+  $('emp-form-error').classList.add('hidden');
+  $('f-intern-fields').classList.add('hidden');
+  if (emp) {
+    $('emp-modal-title').textContent = 'Edit Employee';
+    $('f-employee-id').value = emp.id; $('f-profile-id').value = emp.profiles.id;
+    $('f-first').value = emp.profiles.first_name; $('f-last').value = emp.profiles.last_name;
+    $('f-email').value = emp.profiles.email; $('f-phone').value = emp.profiles.phone || '';
+    $('f-dob').value = emp.profiles.date_of_birth || ''; $('f-address').value = emp.profiles.address || '';
+    $('f-empno').value = emp.employee_number; $('f-dept').value = emp.department_id || '';
+    $('f-position').value = emp.position || ''; $('f-hired').value = emp.date_hired;
+    $('f-type').value = emp.employment_type; $('f-status').value = emp.status; $('f-role').value = emp.role;
+    $('f-user-id').value = emp.profiles.user_id || '';
+    if (emp.employment_type === 'intern') {
+      $('f-intern-fields').classList.remove('hidden');
+      sb.from('internships').select('*').eq('employee_id', emp.id).maybeSingle().then(({data:i}) => {
+        if (i) { $('f-school').value=i.school_name||''; $('f-course').value=i.course||'';
+          $('f-int-start').value=i.start_date||''; $('f-int-end').value=i.end_date||''; $('f-int-hours').value=i.required_hours||''; }
+      });
+    }
+  } else {
+    $('emp-modal-title').textContent = 'Add Employee';
+    $('f-employee-id').value=''; $('f-profile-id').value='';
+    $('f-hired').value = new Date().toISOString().slice(0,10);
+  }
+  $('employee-modal').classList.remove('hidden');
+}
+window.editEmployee = (id) => openEmployeeModal(state.employeesCache.find(e => e.id === id));
+
+window.toggleEmployeeStatus = async (id, current) => {
+  const next = current === 'active' ? 'inactive' : 'active';
+  const { error } = await sb.from('employees').update({ status: next }).eq('id', id);
+  if (error) return alert(error.message);
+  await loadEmployeesTable(); await loadAdminStats();
+};
+
+$('employee-form').onsubmit = async (e) => {
+  e.preventDefault();
+  $('emp-form-error').classList.add('hidden');
+  const profileId = $('f-profile-id').value;
+  const profilePayload = {
+    first_name: $('f-first').value, last_name: $('f-last').value, email: $('f-email').value,
+    phone: $('f-phone').value, date_of_birth: $('f-dob').value || null, address: $('f-address').value,
+    user_id: $('f-user-id').value || null
+  };
+  let pid = profileId;
+  try {
+    if (profileId) {
+      const { error } = await sb.from('profiles').update(profilePayload).eq('id', profileId);
+      if (error) throw error;
+    } else {
+      const { data, error } = await sb.from('profiles').insert(profilePayload).select().single();
+      if (error) throw error;
+      pid = data.id;
+    }
+
+    const empPayload = {
+      profile_id: pid, employee_number: $('f-empno').value,
+      department_id: $('f-dept').value || null, position: $('f-position').value,
+      employment_type: $('f-type').value, date_hired: $('f-hired').value,
+      status: $('f-status').value, role: $('f-role').value
+    };
+    const empId = $('f-employee-id').value;
+    let eid = empId;
+    if (empId) {
+      const { error } = await sb.from('employees').update(empPayload).eq('id', empId);
+      if (error) throw error;
+    } else {
+      const { data, error } = await sb.from('employees').insert(empPayload).select().single();
+      if (error) throw error;
+      eid = data.id;
+    }
+
+    if ($('f-type').value === 'intern') {
+      const internPayload = {
+        employee_id: eid, school_name: $('f-school').value, course: $('f-course').value,
+        start_date: $('f-int-start').value || null, end_date: $('f-int-end').value || null,
+        required_hours: Number($('f-int-hours').value || 0)
+      };
+      const { data: existing } = await sb.from('internships').select('id').eq('employee_id', eid).maybeSingle();
+      if (existing) await sb.from('internships').update(internPayload).eq('id', existing.id);
+      else await sb.from('internships').insert(internPayload);
+    }
+
+    $('employee-modal').classList.add('hidden');
+    await loadEmployeesTable(); await loadAdminStats(); await loadInternsTable();
+  } catch (err) {
+    $('emp-form-error').textContent = err.message; $('emp-form-error').classList.remove('hidden');
+  }
+};
+
+async function loadLeavesTable() {
+  const { data } = await sb.from('leaves').select('*, employees(employee_number, profiles(first_name,last_name))').order('created_at', { ascending:false });
+  document.querySelector('#leaves-table tbody').innerHTML = (data||[]).map(l => `<tr>
+    <td>${l.employees.profiles.first_name} ${l.employees.profiles.last_name}</td><td>${l.leave_type}</td>
+    <td>${fmtDate(l.start_date)}</td><td>${fmtDate(l.end_date)}</td><td>${l.reason||''}</td>
+    <td><span class="badge ${statusColor(l.status)}">${l.status}</span></td>
+    <td class="whitespace-nowrap">${l.status==='pending' ? `
+      <button class="text-green-600 text-xs font-semibold mr-2" onclick="setLeaveStatus('${l.id}','approved')">Approve</button>
+      <button class="text-red-600 text-xs font-semibold" onclick="setLeaveStatus('${l.id}','rejected')">Reject</button>` : ''}
+    </td></tr>`).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-6">No leave requests.</td></tr>';
+}
+window.setLeaveStatus = async (id, status) => {
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('leaves').update({ status, approved_by: state.employee.id }).eq('id', id);
+  if (error) return alert(error.message);
+  await loadLeavesTable(); await loadAdminStats();
+};
+
+$('restday-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const { error } = await sb.from('rest_days').insert({
+    employee_id: $('rd-employee').value, rest_date: $('rd-date').value, notes: $('rd-notes').value
+  });
+  if (error) return alert(error.message);
+  e.target.reset();
+  await loadRestDaysTable();
+};
+async function loadRestDaysTable() {
+  const { data } = await sb.from('rest_days').select('*, employees(profiles(first_name,last_name))').order('rest_date', { ascending:false });
+  document.querySelector('#restdays-table tbody').innerHTML = (data||[]).map(r => `<tr>
+    <td>${r.employees.profiles.first_name} ${r.employees.profiles.last_name}</td><td>${fmtDate(r.rest_date)}</td><td>${r.notes||''}</td></tr>`).join('') || '<tr><td colspan="3" class="text-center text-gray-400 py-6">None assigned.</td></tr>';
+}
+
+$('break-form').onsubmit = async (e) => {
+  e.preventDefault();
+  await sb.from('break_schedules').update({ is_active:false }).eq('is_active', true);
+  const { data: schedule, error } = await sb.from('break_schedules').insert({
+    name: $('brk-name').value, start_time: $('brk-start').value, end_time: $('brk-end').value, is_active:true
+  }).select().single();
+  if (error) return alert(error.message);
+  const { data: active } = await sb.from('employees').select('id').eq('status','active');
+  const rows = (active||[]).map(e => ({ employee_id: e.id, break_schedule_id: schedule.id, effective_date: new Date().toISOString().slice(0,10) }));
+  if (rows.length) await sb.from('employee_break_schedules').insert(rows);
+  await loadBreaksTable();
+};
+async function loadBreaksTable() {
+  const { data } = await sb.from('break_schedules').select('*').order('created_at', { ascending:false });
+  document.querySelector('#breaks-table tbody').innerHTML = (data||[]).map(b => `<tr>
+    <td>${b.name}</td><td>${b.start_time}</td><td>${b.end_time}</td><td>${b.is_active?'Yes':'No'}</td></tr>`).join('') || '<tr><td colspan="4" class="text-center text-gray-400 py-6">No break schedule configured yet.</td></tr>';
+}
+
+async function loadInternsTable() {
+  const { data } = await sb.from('internship_progress').select('*').order('first_name');
+  document.querySelector('#interns-table tbody').innerHTML = (data||[]).map(i => `<tr>
+    <td>${i.first_name} ${i.last_name}</td><td>${i.school_name||'—'}</td><td>${i.required_hours} hrs</td>
+    <td>${i.completed_hours} hrs</td><td>${i.remaining_hours} hrs</td>
+    <td><div class="w-24 bg-gray-100 rounded-full h-2"><div class="bg-[#1a8f9c] h-2 rounded-full" style="width:${i.progress_percent}%"></div></div>${i.progress_percent}%</td>
+    <td><span class="badge ${i.status==='completed'?'bg-green-100 text-green-700':'bg-blue-100 text-blue-700'}">${i.status}</span></td></tr>`).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-6">No interns yet.</td></tr>';
+}
+
+async function loadAttendanceTable(from, to) {
+  let q = sb.from('attendance').select('*, employees(employee_number, profiles(first_name,last_name))').order('attendance_date', { ascending:false }).limit(200);
+  if (from) q = q.gte('attendance_date', from);
+  if (to) q = q.lte('attendance_date', to);
+  const { data } = await q;
+  document.querySelector('#attendance-table tbody').innerHTML = (data||[]).map(a => `<tr>
+    <td>${fmtDate(a.attendance_date)}</td><td>${a.employees.profiles.first_name} ${a.employees.profiles.last_name}</td>
+    <td>${fmtTime(a.clock_in)}</td><td>${fmtTime(a.clock_out)}</td><td>${a.break_minutes} min</td>
+    <td>${fmtHrs(a.worked_minutes)}</td><td>${fmtHrs(a.credited_minutes)}</td>
+    <td><span class="badge ${statusColor(a.status)}">${a.status}</span></td>
+    <td><button class="text-[#1a8f9c] text-xs font-semibold" onclick='openAttendanceModal(${JSON.stringify(a).replace(/'/g,"&#39;")})'>Correct</button></td>
+    </tr>`).join('') || '<tr><td colspan="9" class="text-center text-gray-400 py-6">No attendance records in range.</td></tr>';
+}
+$('att-filter-btn').onclick = () => loadAttendanceTable($('att-from').value, $('att-to').value);
+
+window.openAttendanceModal = (a) => {
+  $('ac-id').value = a.id;
+  $('ac-clockin').value = a.clock_in ? a.clock_in.slice(0,16) : '';
+  $('ac-clockout').value = a.clock_out ? a.clock_out.slice(0,16) : '';
+  $('ac-notes').value = a.notes || '';
+  $('attendance-modal').classList.remove('hidden');
+};
+$('ac-cancel').onclick = () => $('attendance-modal').classList.add('hidden');
+$('attendance-correct-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const { error } = await sb.rpc('admin_correct_attendance', {
+    p_attendance_id: $('ac-id').value,
+    p_clock_in: $('ac-clockin').value ? new Date($('ac-clockin').value).toISOString() : null,
+    p_clock_out: $('ac-clockout').value ? new Date($('ac-clockout').value).toISOString() : null,
+    p_notes: $('ac-notes').value
+  });
+  if (error) return alert(error.message);
+  $('attendance-modal').classList.add('hidden');
+  await loadAttendanceTable($('att-from').value, $('att-to').value);
+};
+
+function toCsv(rows, headers) {
+  const esc = (v) => `"${String(v??'').replace(/"/g,'""')}"`;
+  return [headers.join(','), ...rows.map(r => headers.map(h => esc(r[h])).join(','))].join('\n');
+}
+function downloadCsv(filename, csv) {
+  const blob = new Blob([csv], { type:'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+}
+$('rep-attendance-csv').onclick = async () => {
+  let q = sb.from('attendance').select('*, employees(employee_number, position, profiles(first_name,last_name), departments(name))');
+  if ($('rep-from').value) q = q.gte('attendance_date', $('rep-from').value);
+  if ($('rep-to').value) q = q.lte('attendance_date', $('rep-to').value);
+  const { data } = await q;
+  const rows = (data||[]).map(a => ({
+    date: a.attendance_date, employee_id: a.employees.employee_number,
+    name: a.employees.profiles.first_name+' '+a.employees.profiles.last_name, department: a.employees.departments?.name||'',
+    clock_in: fmtTime(a.clock_in), clock_out: fmtTime(a.clock_out),
+    break_minutes: a.break_minutes, total_hours: (a.worked_minutes/60).toFixed(2), credited_hours: (a.credited_minutes/60).toFixed(2), status: a.status
+  }));
+  downloadCsv('attendance_report.csv', toCsv(rows, ['date','employee_id','name','department','clock_in','clock_out','break_minutes','total_hours','credited_hours','status']));
+};
+$('rep-intern-csv').onclick = async () => {
+  const { data } = await sb.from('internship_progress').select('*');
+  const rows = (data||[]).map(i => ({
+    name: i.first_name+' '+i.last_name, school: i.school_name, course: i.course,
+    required_hours: i.required_hours, completed_hours: i.completed_hours, remaining_hours: i.remaining_hours,
+    progress_percent: i.progress_percent, start_date: i.start_date, end_date: i.end_date, status: i.status
+  }));
+  downloadCsv('internship_report.csv', toCsv(rows, ['name','school','course','required_hours','completed_hours','remaining_hours','progress_percent','start_date','end_date','status']));
+};
+</script>
+</body>
+</html>
