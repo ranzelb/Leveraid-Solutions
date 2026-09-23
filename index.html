@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Leveraid Solutions — Attendance & Internship Portal</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.45.4/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   body{font-family:Inter,system-ui,sans-serif;background:#f4f6f8;}
   .card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
@@ -398,7 +398,19 @@ if (SUPABASE_URL.includes("YOUR-PROJECT")) {
   document.getElementById('config-warning').classList.remove('hidden');
 }
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = (() => {
+  try {
+    if (typeof supabase === 'undefined' || !supabase.createClient) {
+      throw new Error('Supabase library failed to load from the CDN — check your network/ad-blocker and reload.');
+    }
+    return supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (err) {
+    document.body.innerHTML = `<div style="max-width:520px;margin:80px auto;padding:24px;font-family:sans-serif;
+      background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1)">
+      <h2 style="color:#c0392b">App failed to start</h2><p>${err.message}</p></div>`;
+    throw err;
+  }
+})();
 
 const TZ = 'Asia/Manila';
 const $ = (id) => document.getElementById(id);
