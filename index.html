@@ -63,6 +63,15 @@
         <input id="su-last" placeholder="Last Name" required class="border rounded-lg px-3 py-2 text-sm">
       </div>
       <input id="su-email" type="email" required placeholder="you@leveraidsolutions.com" class="border rounded-lg px-3 py-2 text-sm w-full">
+      <div>
+        <label class="text-xs font-semibold text-gray-600">Account Type</label>
+        <select id="su-role" class="mt-1 border rounded-lg px-3 py-2 text-sm w-full">
+          <option value="employee" selected>Employee</option>
+          <option value="intern">Intern / Student</option>
+          <option value="admin">Admin</option>
+        </select>
+        <p id="su-admin-note" class="text-[11px] text-gray-400 mt-1 hidden">An admin account already exists — new "Admin" sign-ups will be created as Employee instead. Ask an existing admin to promote you from the Employees tab.</p>
+      </div>
       <div class="relative">
         <input id="su-password" type="password" required minlength="6" placeholder="Password (min 6 characters)" class="border rounded-lg px-3 py-2 text-sm w-full pr-16">
         <button type="button" data-pwtoggle="su-password" class="pw-toggle absolute right-2 top-2.5 text-xs text-[#1a8f9c] font-semibold">Show</button>
@@ -454,6 +463,16 @@ $('forgot-pw').onclick = async () => {
   alert(error ? error.message : 'Password reset email sent (check inbox).');
 };
 
+// Check whether an admin already exists, so we can be upfront in the UI
+// that "Admin" sign-ups after the first one get downgraded (the real
+// enforcement happens server-side in the handle_new_user trigger either way).
+(async () => {
+  try {
+    const { data: adminExists } = await sb.rpc('any_admin_exists');
+    if (adminExists) $('su-admin-note').classList.remove('hidden');
+  } catch (err) { /* non-critical — ignore */ }
+})();
+
 $('signup-form').onsubmit = async (e) => {
   e.preventDefault();
   $('signup-error').classList.add('hidden'); $('signup-success').classList.add('hidden');
@@ -463,7 +482,7 @@ $('signup-form').onsubmit = async (e) => {
   $('signup-btn').disabled = true; $('signup-btn').textContent = 'Creating account…';
   const { data, error } = await sb.auth.signUp({
     email: $('su-email').value, password: $('su-password').value,
-    options: { data: { first_name: $('su-first').value, last_name: $('su-last').value } }
+    options: { data: { first_name: $('su-first').value, last_name: $('su-last').value, role: $('su-role').value } }
   });
   $('signup-btn').disabled = false; $('signup-btn').textContent = 'Create Account';
   if (error) { $('signup-error').textContent = error.message; $('signup-error').classList.remove('hidden'); return; }
