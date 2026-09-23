@@ -662,12 +662,25 @@ $('leave-form').onsubmit = async (e) => {
 };
 
 /* ---------------------- ADMIN DASHBOARD ---------------------- */
+const ADMIN_TAB_LOADERS = {
+  employees: loadEmployeesTable,
+  leaves: loadLeavesTable,
+  restdays: loadRestDaysTable,
+  breaks: loadBreaksTable,
+  interns: loadInternsTable,
+  attendance: () => loadAttendanceTable($('att-from').value, $('att-to').value),
+  reports: () => {}
+};
 document.querySelectorAll('#admin-tabs .tab-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('#admin-tabs .tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
     $('tab-' + btn.dataset.tab).classList.remove('hidden');
+    // Re-fetch this tab's data every time it's opened, so admins always
+    // see current requests/records instead of whatever was loaded at login.
+    ADMIN_TAB_LOADERS[btn.dataset.tab]?.();
+    loadAdminStats();
   };
 });
 
