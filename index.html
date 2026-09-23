@@ -16,6 +16,8 @@
   .btn-secondary:hover{background:#dbe3e7;}
   .btn-danger{background:#c0392b;color:#fff;}
   .tab-btn.active{border-bottom:3px solid #0f3d4a;color:#0f3d4a;font-weight:700;}
+  .authtab-btn{color:#9aa5a9;}
+  .authtab-btn.active{color:#0f3d4a;border-bottom:2px solid #0f3d4a;}
   table{width:100%;border-collapse:collapse;font-size:.875rem;}
   th{text-align:left;padding:.6rem .75rem;background:#f0f3f4;color:#456;font-weight:600;position:sticky;top:0;}
   td{padding:.55rem .75rem;border-bottom:1px solid #eef1f2;}
@@ -36,7 +38,7 @@
   </div>
 </div>
 
-<!-- ===================== LOGIN VIEW ===================== -->
+<!-- ===================== LOGIN / SIGNUP VIEW ===================== -->
 <div id="view-login" class="min-h-screen flex items-center justify-center px-4">
   <div class="card w-full max-w-sm p-8">
     <div class="flex items-center gap-2 mb-1">
@@ -46,9 +48,34 @@
         <div class="text-[10px] tracking-widest text-[#1a8f9c] -mt-1">SOLUTIONS</div>
       </div>
     </div>
-    <p class="text-sm text-gray-500 mb-6">Attendance, Leave & Internship Portal</p>
+    <p class="text-sm text-gray-500 mb-4">Attendance, Leave & Internship Portal</p>
 
-    <form id="login-form" class="space-y-3">
+    <div class="flex border-b mb-4 text-sm">
+      <button data-authtab="signup" class="authtab-btn active flex-1 py-2 font-semibold">Sign Up</button>
+      <button data-authtab="login" class="authtab-btn flex-1 py-2 font-semibold">Log In</button>
+      <button data-authtab="adminlogin" class="authtab-btn flex-1 py-2 font-semibold">Admin Log In</button>
+    </div>
+
+    <!-- SIGN UP -->
+    <form id="signup-form" class="auth-panel space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="su-first" placeholder="First Name" required class="border rounded-lg px-3 py-2 text-sm">
+        <input id="su-last" placeholder="Last Name" required class="border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <input id="su-email" type="email" required placeholder="you@leveraidsolutions.com" class="border rounded-lg px-3 py-2 text-sm w-full">
+      <div class="relative">
+        <input id="su-password" type="password" required minlength="6" placeholder="Password (min 6 characters)" class="border rounded-lg px-3 py-2 text-sm w-full pr-16">
+        <button type="button" data-pwtoggle="su-password" class="pw-toggle absolute right-2 top-2.5 text-xs text-[#1a8f9c] font-semibold">Show</button>
+      </div>
+      <input id="su-password2" type="password" required minlength="6" placeholder="Confirm Password" class="border rounded-lg px-3 py-2 text-sm w-full">
+      <p id="signup-error" class="text-xs text-red-600 hidden"></p>
+      <p id="signup-success" class="text-xs text-green-600 hidden"></p>
+      <button type="submit" id="signup-btn" class="btn btn-primary w-full mt-1">Create Account</button>
+      <p class="text-[11px] text-gray-400">New accounts start as a regular Employee. An admin can change your role, department, and internship details afterward — or promote you to Admin directly in Supabase (see schema.sql).</p>
+    </form>
+
+    <!-- EMPLOYEE / INTERN LOGIN -->
+    <form id="login-form" class="auth-panel hidden space-y-3">
       <div>
         <label class="text-xs font-semibold text-gray-600">Email</label>
         <input id="login-email" type="email" required class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="you@leveraidsolutions.com">
@@ -57,12 +84,30 @@
         <label class="text-xs font-semibold text-gray-600">Password</label>
         <div class="relative">
           <input id="login-password" type="password" required class="mt-1 w-full border rounded-lg px-3 py-2 text-sm pr-16">
-          <button type="button" id="toggle-pw" class="absolute right-2 top-3 text-xs text-[#1a8f9c] font-semibold">Show</button>
+          <button type="button" data-pwtoggle="login-password" class="pw-toggle absolute right-2 top-3 text-xs text-[#1a8f9c] font-semibold">Show</button>
         </div>
       </div>
       <p id="login-error" class="text-xs text-red-600 hidden"></p>
       <button type="submit" id="login-btn" class="btn btn-primary w-full mt-2">Log In</button>
       <button type="button" id="forgot-pw" class="text-xs text-gray-500 underline w-full text-center mt-1">Forgot password?</button>
+    </form>
+
+    <!-- ADMIN LOGIN -->
+    <form id="adminlogin-form" class="auth-panel hidden space-y-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-600">Admin Email</label>
+        <input id="admin-email" type="email" required class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="admin@leveraidsolutions.com">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-600">Password</label>
+        <div class="relative">
+          <input id="admin-password" type="password" required class="mt-1 w-full border rounded-lg px-3 py-2 text-sm pr-16">
+          <button type="button" data-pwtoggle="admin-password" class="pw-toggle absolute right-2 top-3 text-xs text-[#1a8f9c] font-semibold">Show</button>
+        </div>
+      </div>
+      <p id="adminlogin-error" class="text-xs text-red-600 hidden"></p>
+      <button type="submit" id="adminlogin-btn" class="btn btn-primary w-full mt-2">Admin Log In</button>
+      <p class="text-[11px] text-gray-400">This checks that the account's role is Admin. Regular employee/intern accounts will be rejected here — use the Log In tab instead.</p>
     </form>
   </div>
 </div>
@@ -372,17 +417,53 @@ const statusColor = (s) => ({
 let state = { user:null, employee:null, profile:null, departments:[], employeesCache:[] };
 
 /* ---------------------- AUTH ---------------------- */
-$('toggle-pw').onclick = () => {
-  const pw = $('login-password');
-  pw.type = pw.type === 'password' ? 'text' : 'password';
-  $('toggle-pw').textContent = pw.type === 'password' ? 'Show' : 'Hide';
-};
+const AUTH_TAB_FORMS = { signup:'signup-form', login:'login-form', adminlogin:'adminlogin-form' };
+document.querySelectorAll('.authtab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.authtab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.auth-panel').forEach(p => p.classList.add('hidden'));
+    $(AUTH_TAB_FORMS[btn.dataset.authtab]).classList.remove('hidden');
+  };
+});
+
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.onclick = () => {
+    const input = $(btn.dataset.pwtoggle);
+    input.type = input.type === 'password' ? 'text' : 'password';
+    btn.textContent = input.type === 'password' ? 'Show' : 'Hide';
+  };
+});
 
 $('forgot-pw').onclick = async () => {
   const email = $('login-email').value;
   if (!email) return alert('Enter your email first, then click Forgot password.');
   const { error } = await sb.auth.resetPasswordForEmail(email);
   alert(error ? error.message : 'Password reset email sent (check inbox).');
+};
+
+$('signup-form').onsubmit = async (e) => {
+  e.preventDefault();
+  $('signup-error').classList.add('hidden'); $('signup-success').classList.add('hidden');
+  if ($('su-password').value !== $('su-password2').value) {
+    $('signup-error').textContent = 'Passwords do not match.'; $('signup-error').classList.remove('hidden'); return;
+  }
+  $('signup-btn').disabled = true; $('signup-btn').textContent = 'Creating account…';
+  const { data, error } = await sb.auth.signUp({
+    email: $('su-email').value, password: $('su-password').value,
+    options: { data: { first_name: $('su-first').value, last_name: $('su-last').value } }
+  });
+  $('signup-btn').disabled = false; $('signup-btn').textContent = 'Create Account';
+  if (error) { $('signup-error').textContent = error.message; $('signup-error').classList.remove('hidden'); return; }
+
+  if (data.session) {
+    // Email confirmation is off for this project — log straight in.
+    await bootAfterLogin();
+  } else {
+    $('signup-success').textContent = 'Account created! Check your email to confirm it, then use the Log In tab.';
+    $('signup-success').classList.remove('hidden');
+    e.target.reset();
+  }
 };
 
 $('login-form').onsubmit = async (e) => {
@@ -397,19 +478,47 @@ $('login-form').onsubmit = async (e) => {
   await bootAfterLogin();
 };
 
+$('adminlogin-form').onsubmit = async (e) => {
+  e.preventDefault();
+  $('adminlogin-error').classList.add('hidden');
+  $('adminlogin-btn').disabled = true; $('adminlogin-btn').textContent = 'Logging in…';
+  const { error } = await sb.auth.signInWithPassword({
+    email: $('admin-email').value, password: $('admin-password').value
+  });
+  $('adminlogin-btn').disabled = false; $('adminlogin-btn').textContent = 'Admin Log In';
+  if (error) { $('adminlogin-error').textContent = error.message; $('adminlogin-error').classList.remove('hidden'); return; }
+  await bootAfterLogin({ requireAdmin: true, errorEl: $('adminlogin-error') });
+};
+
 $('logout-btn').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
-async function bootAfterLogin() {
+async function bootAfterLogin(opts) {
+  opts = opts || {};
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
   state.user = user;
 
-  const { data: profile } = await sb.from('profiles').select('*').eq('user_id', user.id).single();
-  if (!profile) { alert('No profile linked to this login yet. Ask an admin to link your account.'); await sb.auth.signOut(); return; }
+  const { data: profile, error: profileErr } = await sb.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+  if (profileErr) console.error('profile lookup failed:', profileErr);
+  if (!profile) {
+    const msg = 'No profile found for this login yet. If you just signed up, wait a moment and try again — if this keeps happening, tell your admin.';
+    if (opts.errorEl) { opts.errorEl.textContent = msg; opts.errorEl.classList.remove('hidden'); } else { alert(msg); }
+    await sb.auth.signOut(); return;
+  }
   state.profile = profile;
 
-  const { data: employee } = await sb.from('employees').select('*, departments(name)').eq('profile_id', profile.id).single();
-  if (!employee) { alert('No employee record linked yet. Ask an admin to finish your setup.'); await sb.auth.signOut(); return; }
+  const { data: employee, error: empErr } = await sb.from('employees').select('*, departments(name)').eq('profile_id', profile.id).maybeSingle();
+  if (empErr) console.error('employee lookup failed:', empErr);
+  if (!employee) {
+    const msg = 'No employee record linked to this login yet. Ask an admin to finish your setup.';
+    if (opts.errorEl) { opts.errorEl.textContent = msg; opts.errorEl.classList.remove('hidden'); } else { alert(msg); }
+    await sb.auth.signOut(); return;
+  }
+  if (opts.requireAdmin && employee.role !== 'admin') {
+    opts.errorEl.textContent = 'This account does not have Admin access. Use the Log In tab instead.';
+    opts.errorEl.classList.remove('hidden');
+    await sb.auth.signOut(); return;
+  }
   state.employee = employee;
 
   $('view-login').classList.add('hidden');
